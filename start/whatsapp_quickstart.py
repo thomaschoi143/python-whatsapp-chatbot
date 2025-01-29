@@ -83,9 +83,7 @@ def send_message(data):
         return response
 
 
-data = get_text_message_input(
-    recipient=RECIPIENT_WAID, text="Hello, this is a test message."
-)
+data = get_text_message_input(recipient=RECIPIENT_WAID, text="Hello, this is a test message.")
 
 response = send_message(data)
 
@@ -130,9 +128,7 @@ def get_text_message_input(recipient, text):
     )
 
 
-data = get_text_message_input(
-    recipient=RECIPIENT_WAID, text="Hello, this is a test message."
-)
+data = get_text_message_input(recipient=RECIPIENT_WAID, text="Hello, this is a test message.")
 
 loop = asyncio.get_event_loop()
 loop.run_until_complete(send_message(data))

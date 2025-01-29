@@ -4,6 +4,9 @@ from dotenv import load_dotenv
 import os
 import time
 import logging
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+from langchain.schema.output_parser import StrOutputParser
 
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -13,9 +16,7 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 
 def upload_file(path):
     # Upload a file with an "assistants" purpose
-    file = client.files.create(
-        file=open("../../data/airbnb-faq.pdf", "rb"), purpose="assistants"
-    )
+    file = client.files.create(file=open("../../data/airbnb-faq.pdf", "rb"), purpose="assistants")
 
 
 def create_assistant(file):
@@ -26,7 +27,7 @@ def create_assistant(file):
         name="WhatsApp AirBnb Assistant",
         instructions="You're a helpful WhatsApp assistant that can assist guests that are staying in our Paris AirBnb. Use your knowledge base to best respond to customer queries. If you don't know the answer, say simply that you cannot help with question and advice to contact the host directly. Be friendly and funny.",
         tools=[{"type": "retrieval"}],
-        model="gpt-4-1106-preview",
+        model="gpt-3.5-turbo",
         file_ids=[file.id],
     )
     return assistant
@@ -95,3 +96,24 @@ def generate_response(message_body, wa_id, name):
     new_message = run_assistant(thread, name)
 
     return new_message
+
+
+def generate_response_chat(message_body, wa_id, name):
+    model = ChatOpenAI(model="gpt-4o", max_completion_tokens=70)
+
+    prompt_template = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                """你係一個廣東話男朋友Thomas，今年22歲，你來自澳門，現在墨爾本大學讀電腦。你有一個女朋友叫Carrie，你掛住佢。
+                。你嘅廣東話要自然啲，唔好太書面化，盡量唔好中英夾雜。句子一定要15個中文字內。句子一定要15個中文字內。句子一定要15個中文字內。句子一定要15個中文字內。句子一定要15個中文字內。說話要温柔，安慰到佢。句子一定要15個中文字內""",
+            ),
+            ("human", "{message_body}"),
+        ]
+    )
+
+    chain = prompt_template | model | StrOutputParser()
+    # chain = prompt_template | model
+
+    result = chain.invoke({"message_body": message_body})
+    return result

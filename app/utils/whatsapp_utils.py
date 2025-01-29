@@ -3,31 +3,34 @@ from flask import current_app, jsonify
 import json
 import requests
 
-# from app.services.openai_service import generate_response
+from app.services.openai_service import generate_response_chat, generate_response
+from app.services.cantonese_service import get_cantonese_audio
 import re
+import os
 
 
 def log_http_response(response):
     logging.info(f"Status: {response.status_code}")
-    logging.info(f"Content-type: {response.headers.get('content-type')}")
-    logging.info(f"Body: {response.text}")
+    # logging.info(f"Content-type: {response.headers.get('content-type')}")
+    # logging.info(f"Body: {response.text}")
 
 
-def get_text_message_input(recipient, text):
+def get_response_message_input(recipient, type, response):
     return json.dumps(
         {
             "messaging_product": "whatsapp",
             "recipient_type": "individual",
             "to": recipient,
-            "type": "text",
-            "text": {"preview_url": False, "body": text},
+            "type": "audio" if type == "audio" else "text",
+            "audio": {"id": response} if type == "audio" else None,
+            "text": {"preview_url": False, "body": response} if type == "text" else None,
         }
     )
 
 
-def generate_response(response):
-    # Return text in uppercase
-    return response.upper()
+# def generate_response(response):
+#     # Return text in uppercase
+#     return response.upper()
 
 
 def send_message(data):
@@ -39,16 +42,12 @@ def send_message(data):
     url = f"https://graph.facebook.com/{current_app.config['VERSION']}/{current_app.config['PHONE_NUMBER_ID']}/messages"
 
     try:
-        response = requests.post(
-            url, data=data, headers=headers, timeout=10
-        )  # 10 seconds timeout as an example
+        response = requests.post(url, data=data, headers=headers, timeout=10)  # 10 seconds timeout as an example
         response.raise_for_status()  # Raises an HTTPError if the HTTP request returned an unsuccessful status code
     except requests.Timeout:
         logging.error("Timeout occurred while sending message")
         return jsonify({"status": "error", "message": "Request timed out"}), 408
-    except (
-        requests.RequestException
-    ) as e:  # This will catch any general request exception
+    except requests.RequestException as e:  # This will catch any general request exception
         logging.error(f"Request failed due to: {e}")
         return jsonify({"status": "error", "message": "Failed to send message"}), 500
     else:
@@ -75,21 +74,51 @@ def process_text_for_whatsapp(text):
     return whatsapp_style_text
 
 
+def upload_audio(audio_filename):
+    with open(audio_filename, "rb") as audio_file:
+        files = {"file": (audio_filename, audio_file, "audio/mpeg")}
+        data = {"messaging_product": "whatsapp"}  # Specify that it's an audio file
+        headers = {"Authorization": f"Bearer {current_app.config['ACCESS_TOKEN']}"}
+
+        # Send POST request
+        url = (
+            f"https://graph.facebook.com/{current_app.config['VERSION']}/{current_app.config['PHONE_NUMBER_ID']}/media"
+        )
+        response = requests.post(url, files=files, data=data, headers=headers)
+
+    return response.json()["id"]
+
+
 def process_whatsapp_message(body):
     wa_id = body["entry"][0]["changes"][0]["value"]["contacts"][0]["wa_id"]
     name = body["entry"][0]["changes"][0]["value"]["contacts"][0]["profile"]["name"]
 
     message = body["entry"][0]["changes"][0]["value"]["messages"][0]
-    message_body = message["text"]["body"]
+    if "text" not in message:
+        data = get_response_message_input(wa_id, "text", "唔好意思 我而家淨係可以收text message")
+        send_message(data)
+        return
 
-    # TODO: implement custom function here
-    response = generate_response(message_body)
+    message_body = message["text"]["body"]
+    logging.info(f"Received message from {wa_id} {name}: {message_body}")
 
     # OpenAI Integration
-    # response = generate_response(message_body, wa_id, name)
+    response = generate_response(message_body, wa_id, name)
     # response = process_text_for_whatsapp(response)
 
-    data = get_text_message_input(current_app.config["RECIPIENT_WAID"], response)
+    # data = get_response_message_input(wa_id, "text", response)
+    # send_message(data)
+
+    # Cantonese AI Integration
+    audio_filename = get_cantonese_audio(response)
+
+    if not audio_filename:
+        data = get_response_message_input(wa_id, "text", "唔好意思 我唔明白")
+        send_message(data)
+        return
+
+    audio_id = upload_audio(audio_filename)
+    data = get_response_message_input(wa_id, "audio", audio_id)
     send_message(data)
 
 

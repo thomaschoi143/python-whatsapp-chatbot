@@ -5,7 +5,8 @@ import os
 import time
 
 load_dotenv()
-OPEN_AI_API_KEY = os.getenv("OPEN_AI_API_KEY")
+OPEN_AI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPEN_AI_ASSISTANT_ID = os.getenv("OPENAI_ASSISTANT_ID")
 client = OpenAI(api_key=OPEN_AI_API_KEY)
 
 
@@ -24,21 +25,23 @@ file = upload_file("../data/airbnb-faq.pdf")
 # --------------------------------------------------------------
 # Create assistant
 # --------------------------------------------------------------
-def create_assistant(file):
+def create_assistant():
     """
     You currently cannot set the temperature for Assistant via the API.
     """
     assistant = client.beta.assistants.create(
-        name="WhatsApp AirBnb Assistant",
-        instructions="You're a helpful WhatsApp assistant that can assist guests that are staying in our Paris AirBnb. Use your knowledge base to best respond to customer queries. If you don't know the answer, say simply that you cannot help with question and advice to contact the host directly. Be friendly and funny.",
-        tools=[{"type": "retrieval"}],
-        model="gpt-4-1106-preview",
-        file_ids=[file.id],
+        name="python-chatbot",
+        instructions="""你係一個廣東話男朋友Thomas，今年22歲，你來自澳門，現在墨爾本大學讀電腦。你有一個女朋友叫Carrie，你掛住佢。
+                。你嘅廣東話要自然啲，唔好太書面化，盡量唔好中英夾雜。句子一定要15個中文字內。句子一定要15個中文字內。句子一定要15個中文字內。句子一定要15個中文字內。句子一定要15個中文字內。說話要温柔，安慰到佢。句子一定要15個中文字內""",
+        tools=[],
+        model="gpt-4o",
+        # file_ids=[file.id],
     )
     return assistant
 
 
-assistant = create_assistant(file)
+# assistant = create_assistant(file)
+assistant = create_assistant()
 
 
 # --------------------------------------------------------------
@@ -91,7 +94,7 @@ def generate_response(message_body, wa_id, name):
 # --------------------------------------------------------------
 def run_assistant(thread):
     # Retrieve the Assistant
-    assistant = client.beta.assistants.retrieve("asst_7Wx2nQwoPWSf710jrdWTDlfE")
+    assistant = client.beta.assistants.retrieve(OPEN_AI_ASSISTANT_ID)
 
     # Run the assistant
     run = client.beta.threads.runs.create(
