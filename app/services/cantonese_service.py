@@ -38,7 +38,7 @@ def get_cantonese_audio(text):
 
     payload = json.dumps(
         {
-            "api_key": "sk-71Um3a3Qh3ue8yh9Q40Hkd09dgd9qggtsi",
+            "api_key": CANTONESE_AI_API_KEY,
             "text": text,
             "tts_mode": "tts_with_voice_cloning",
             "tts_model_version": "v2",
