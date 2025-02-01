@@ -51,14 +51,11 @@ def get_cantonese_audio(text):
     )
     headers = {"Content-Type": "application/json"}
 
-    response = requests.request("POST", url, headers=headers, data=payload)
+    response = requests.request("POST", url, headers=headers, data=payload, stream=True)
     if response.status_code == 200:
-        audio_filename = os.path.join(os.getcwd(), "data", "audio.mp3")
-        with open(audio_filename, "wb") as audio_file:
-            audio_file.write(response.content)
         # trim_mp3(audio_filename, audio_filename)
-        logging.info("Audio saved")
-        return audio_filename
+        logging.info("Cantonese AI: successful")
+        return response.raw
 
     logging.info(f"Cantonese AI Error: {response.status_code}")
     logging.info(f"Cantonese AI Text: {response.text}")

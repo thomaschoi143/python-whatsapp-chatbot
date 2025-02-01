@@ -73,17 +73,14 @@ def send_message(data):
 #     return whatsapp_style_text
 
 
-def upload_media(media, filename):
-    with open(filename, "rb") as audio_file:
-        files = {"file": (filename, audio_file, media)}
-        data = {"messaging_product": "whatsapp"}  # Specify that it's an audio file
-        headers = {"Authorization": f"Bearer {current_app.config['ACCESS_TOKEN']}"}
+def upload_media(media_type, filename, file):
+    files = {"file": (filename, file, media_type)}
+    data = {"messaging_product": "whatsapp"}
+    headers = {"Authorization": f"Bearer {current_app.config['ACCESS_TOKEN']}"}
 
-        # Send POST request
-        url = (
-            f"https://graph.facebook.com/{current_app.config['VERSION']}/{current_app.config['PHONE_NUMBER_ID']}/media"
-        )
-        response = requests.post(url, files=files, data=data, headers=headers)
+    # Send POST request
+    url = f"https://graph.facebook.com/{current_app.config['VERSION']}/{current_app.config['PHONE_NUMBER_ID']}/media"
+    response = requests.post(url, files=files, data=data, headers=headers)
 
     return response.json()["id"]
 
@@ -105,14 +102,14 @@ def process_whatsapp_message(body):
         response, sticker = generate_response(message_body, wa_id, name)
 
         # Cantonese AI Integration
-        audio_filename = get_cantonese_audio(response)
+        audio = get_cantonese_audio(response)
 
-        if not audio_filename:
+        if not audio:
             data = get_response_message_input(wa_id, "text", "唔好意思 我唔明白")
             send_message(data)
             return
 
-        audio_id = upload_media("audio/mpeg", audio_filename)
+        audio_id = upload_media("audio/mpeg", "audio.mp3", audio)
 
         data = get_response_message_input(wa_id, "audio", audio_id)
         send_message(data)
