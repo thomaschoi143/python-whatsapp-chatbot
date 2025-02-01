@@ -2,12 +2,11 @@ from dotenv import load_dotenv
 import os
 import logging
 from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain.schema.output_parser import StrOutputParser
-from app.services.firestore_service import get_chat_history
-from langchain_core.messages import SystemMessage
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from app.services.aws_service import get_all_stickers_description
+from langchain_core.runnables.history import RunnableWithMessageHistory
 import re
+from langchain_community.chat_message_histories import DynamoDBChatMessageHistory
 
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -17,7 +16,7 @@ MY_WA_ID = os.getenv("MY_WA_ID")
 FM_WA_IDS = os.getenv("FM_WA_IDS", "").split(",")
 
 # client = OpenAI(api_key=OPENAI_API_KEY)
-model = ChatOpenAI(model="gpt-4o", max_completion_tokens=70)
+model = ChatOpenAI(model="gpt-4o")
 logging.info("LLM client started")
 
 stickers_description = get_all_stickers_description()
@@ -107,13 +106,13 @@ stickers_description = get_all_stickers_description()
 
 def decide_system_msg(wa_id, name):
     system_msg = f"You are a helpful WhatsApp assistant. You are serving {name}"
-    sticker_instruction = f"回覆中在這裏選擇合適的情緒：{stickers_description}（以*分隔）"
+    sticker_instruction = f"回覆中在這裏選擇合適的情緒：{stickers_description}。"
     if wa_id == GF_WA_ID:
         system_msg = """你係一個廣東話男朋友Thomas，今年22歲，你來自澳門，現在墨爾本大學讀電腦。你有一個女朋友叫Carrie，你掛住佢。
-                    。你嘅廣東話要自然啲，唔好太書面化，盡量唔好中英夾雜。句子一定要15個中文字。說話要温柔，安慰到佢，陪人傾計"""
+                    。你嘅廣東話要自然啲，唔好太書面化，盡量唔好中英夾雜。句子一定要30個中文字內。說話要温柔，安慰到佢，陪人傾計。句子一定要30個中文字內。"""
         system_msg += sticker_instruction
     elif wa_id == MY_WA_ID:
-        system_msg = """你係一個繁體中文廣東話助手。廣東話要自然啲。廣東話要自然啲。句子一定要20個中文字內。句子一定要20個中文字內。你服務緊Thomas"""
+        system_msg = """你係一個繁體中文廣東話助手。廣東話要自然啲。廣東話要自然啲。句子一定要30個中文字內。句子一定要30個中文字內。你服務緊Thomas。"""
         system_msg += sticker_instruction
     elif wa_id in FM_WA_IDS:
         system_msg = f"你係一個廣東話助手Thomas。你有屋企人叫{name}。熱心助人。幫助解決屋企大小事。"
@@ -122,20 +121,35 @@ def decide_system_msg(wa_id, name):
 
 def generate_response(message_body, wa_id, name):
 
-    system_msg = SystemMessage(content=decide_system_msg(wa_id, name))
+    system_msg = decide_system_msg(wa_id, name)
 
-    chat_history = get_chat_history(wa_id)
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", system_msg),
+            MessagesPlaceholder(variable_name="history"),
+            ("human", "{human_input}"),
+        ]
+    )
 
-    chat_history.add_user_message(message_body)
-    prompt_template = ChatPromptTemplate.from_messages([system_msg] + chat_history.messages)
+    chain = prompt | model
+    chat_history_table = "chatbot-history"
+    chain_with_history = RunnableWithMessageHistory(
+        chain,
+        lambda session_id: DynamoDBChatMessageHistory(
+            table_name=chat_history_table, session_id=session_id, primary_key_name="session_id"
+        ),
+        input_messages_key="human_input",
+        history_messages_key="history",
+    )
 
-    chain = prompt_template | model | StrOutputParser()
+    config = {"configurable": {"session_id": wa_id}}
 
-    result = chain.invoke({"stickers_description": stickers_description})
+    result = chain_with_history.invoke({"human_input": message_body}, config=config)
 
-    matching = re.match(r"(?:\*(.*)\*\s*)?(.+)(?:\s*\*(.*)\*)?", result)
-    response = matching.group(2).strip()
-    sticker_name = matching.group(1) or matching.group(3)
+    matching = re.match(r"(.*)\*(.*)\*", result.content)
+
+    response = matching.group(1).strip()
+    sticker_name = matching.group(2)
 
     logging.info(f"Generated message: [{response}] [{sticker_name}]")
 
