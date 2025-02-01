@@ -3,7 +3,7 @@ from flask import current_app, jsonify
 import json
 import requests
 
-from app.services.openai_service import generate_response_chat, generate_response
+from app.services.openai_service import generate_response
 from app.services.cantonese_service import get_cantonese_audio
 import re
 import os
@@ -21,8 +21,8 @@ def get_response_message_input(recipient, type, response):
             "messaging_product": "whatsapp",
             "recipient_type": "individual",
             "to": recipient,
-            "type": "audio" if type == "audio" else "text",
-            "audio": {"id": response} if type == "audio" else None,
+            "type": type,
+            type: {"id": response} if type != "text" else None,
             "text": {"preview_url": False, "body": response} if type == "text" else None,
         }
     )
@@ -56,27 +56,27 @@ def send_message(data):
         return response
 
 
-def process_text_for_whatsapp(text):
-    # Remove brackets
-    pattern = r"\【.*?\】"
-    # Substitute the pattern with an empty string
-    text = re.sub(pattern, "", text).strip()
+# def process_text_for_whatsapp(text):
+#     # Remove brackets
+#     pattern = r"\【.*?\】"
+#     # Substitute the pattern with an empty string
+#     text = re.sub(pattern, "", text).strip()
 
-    # Pattern to find double asterisks including the word(s) in between
-    pattern = r"\*\*(.*?)\*\*"
+#     # Pattern to find double asterisks including the word(s) in between
+#     pattern = r"\*\*(.*?)\*\*"
 
-    # Replacement pattern with single asterisks
-    replacement = r"*\1*"
+#     # Replacement pattern with single asterisks
+#     replacement = r"*\1*"
 
-    # Substitute occurrences of the pattern with the replacement
-    whatsapp_style_text = re.sub(pattern, replacement, text)
+#     # Substitute occurrences of the pattern with the replacement
+#     whatsapp_style_text = re.sub(pattern, replacement, text)
 
-    return whatsapp_style_text
+#     return whatsapp_style_text
 
 
-def upload_audio(audio_filename):
-    with open(audio_filename, "rb") as audio_file:
-        files = {"file": (audio_filename, audio_file, "audio/mpeg")}
+def upload_media(media, filename):
+    with open(filename, "rb") as audio_file:
+        files = {"file": (filename, audio_file, media)}
         data = {"messaging_product": "whatsapp"}  # Specify that it's an audio file
         headers = {"Authorization": f"Bearer {current_app.config['ACCESS_TOKEN']}"}
 
@@ -94,32 +94,40 @@ def process_whatsapp_message(body):
     name = body["entry"][0]["changes"][0]["value"]["contacts"][0]["profile"]["name"]
 
     message = body["entry"][0]["changes"][0]["value"]["messages"][0]
-    if "text" not in message:
-        data = get_response_message_input(wa_id, "text", "唔好意思 我而家淨係可以收text message")
+
+    if "sticker" in message:
+        sticker_id = "589740883852670"
+        logging.info(f"Received message from {wa_id} {name}: sticker")
+        logging.info(f"Respond with sticker: smile")
+        data = get_response_message_input(wa_id, "sticker", sticker_id)
+        send_message(data)
+
+    elif "text" in message:
+        message_body = message["text"]["body"]
+        logging.info(f"Received message from {wa_id} {name}: {message_body}")
+
+        # OpenAI Integration
+        response = generate_response(message_body, wa_id, name)
+        # response = process_text_for_whatsapp(response)
+
+        # data = get_response_message_input(wa_id, "text", response)
+        # send_message(data)
+
+        # Cantonese AI Integration
+        audio_filename = get_cantonese_audio(response)
+
+        if not audio_filename:
+            data = get_response_message_input(wa_id, "text", "唔好意思 我唔明白")
+            send_message(data)
+            return
+
+        audio_id = upload_media("audio/mpeg", audio_filename)
+        data = get_response_message_input(wa_id, "audio", audio_id)
+        send_message(data)
+    else:
+        data = get_response_message_input(wa_id, "text", "唔好意思 我而家淨係可以收text message同sticker")
         send_message(data)
         return
-
-    message_body = message["text"]["body"]
-    logging.info(f"Received message from {wa_id} {name}: {message_body}")
-
-    # OpenAI Integration
-    response = generate_response(message_body, wa_id, name)
-    # response = process_text_for_whatsapp(response)
-
-    # data = get_response_message_input(wa_id, "text", response)
-    # send_message(data)
-
-    # Cantonese AI Integration
-    audio_filename = get_cantonese_audio(response)
-
-    if not audio_filename:
-        data = get_response_message_input(wa_id, "text", "唔好意思 我唔明白")
-        send_message(data)
-        return
-
-    audio_id = upload_audio(audio_filename)
-    data = get_response_message_input(wa_id, "audio", audio_id)
-    send_message(data)
 
 
 def is_valid_whatsapp_message(body):
