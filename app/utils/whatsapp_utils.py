@@ -5,8 +5,7 @@ import requests
 
 from app.services.openai_service import generate_response
 from app.services.cantonese_service import get_cantonese_audio
-import re
-import os
+from app.services.aws_service import get_sticker_s3_url
 
 
 def log_http_response(response):
@@ -22,7 +21,7 @@ def get_response_message_input(recipient, type, response):
             "recipient_type": "individual",
             "to": recipient,
             "type": type,
-            type: {"id": response} if type != "text" else None,
+            type: {"id" if type == "audio" else "link": response} if type != "text" else None,
             "text": {"preview_url": False, "body": response} if type == "text" else None,
         }
     )
@@ -96,22 +95,14 @@ def process_whatsapp_message(body):
     message = body["entry"][0]["changes"][0]["value"]["messages"][0]
 
     if "sticker" in message:
-        sticker_id = "589740883852670"
-        logging.info(f"Received message from {wa_id} {name}: sticker")
-        logging.info(f"Respond with sticker: smile")
-        data = get_response_message_input(wa_id, "sticker", sticker_id)
-        send_message(data)
+        logging.info(f"Received sticker from {wa_id} {name}")
 
     elif "text" in message:
         message_body = message["text"]["body"]
         logging.info(f"Received message from {wa_id} {name}: {message_body}")
 
         # OpenAI Integration
-        response = generate_response(message_body, wa_id, name)
-        # response = process_text_for_whatsapp(response)
-
-        # data = get_response_message_input(wa_id, "text", response)
-        # send_message(data)
+        response, sticker = generate_response(message_body, wa_id, name)
 
         # Cantonese AI Integration
         audio_filename = get_cantonese_audio(response)
@@ -122,8 +113,14 @@ def process_whatsapp_message(body):
             return
 
         audio_id = upload_media("audio/mpeg", audio_filename)
+
         data = get_response_message_input(wa_id, "audio", audio_id)
         send_message(data)
+
+        if sticker:
+            sticker_url = get_sticker_s3_url(sticker)
+            data = get_response_message_input(wa_id, "sticker", sticker_url)
+            send_message(data)
     else:
         data = get_response_message_input(wa_id, "text", "唔好意思 我而家淨係可以收text message同sticker")
         send_message(data)

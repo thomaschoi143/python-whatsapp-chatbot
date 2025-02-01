@@ -1,15 +1,13 @@
-from openai import OpenAI
-import shelve
 from dotenv import load_dotenv
 import os
-import time
 import logging
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain.schema.output_parser import StrOutputParser
 from app.services.firestore_service import get_chat_history
 from langchain_core.messages import SystemMessage
-
+from app.services.aws_service import get_all_stickers_description
+import re
 
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -22,6 +20,7 @@ FM_WA_IDS = os.getenv("FM_WA_IDS", "").split(",")
 model = ChatOpenAI(model="gpt-4o", max_completion_tokens=70)
 logging.info("LLM client started")
 
+stickers_description = get_all_stickers_description()
 # def upload_file(path):
 #     # Upload a file with an "assistants" purpose
 #     file = client.files.create(file=open("../../data/airbnb-faq.pdf", "rb"), purpose="assistants")
@@ -108,11 +107,14 @@ logging.info("LLM client started")
 
 def decide_system_msg(wa_id, name):
     system_msg = f"You are a helpful WhatsApp assistant. You are serving {name}"
+    sticker_instruction = f"回覆中在這裏選擇合適的情緒：{stickers_description}（以*分隔）"
     if wa_id == GF_WA_ID:
         system_msg = """你係一個廣東話男朋友Thomas，今年22歲，你來自澳門，現在墨爾本大學讀電腦。你有一個女朋友叫Carrie，你掛住佢。
                     。你嘅廣東話要自然啲，唔好太書面化，盡量唔好中英夾雜。句子一定要15個中文字。說話要温柔，安慰到佢，陪人傾計"""
+        system_msg += sticker_instruction
     elif wa_id == MY_WA_ID:
         system_msg = """你係一個繁體中文廣東話助手。廣東話要自然啲。廣東話要自然啲。句子一定要20個中文字內。句子一定要20個中文字內。你服務緊Thomas"""
+        system_msg += sticker_instruction
     elif wa_id in FM_WA_IDS:
         system_msg = f"你係一個廣東話助手Thomas。你有屋企人叫{name}。熱心助人。幫助解決屋企大小事。"
     return system_msg
@@ -129,7 +131,12 @@ def generate_response(message_body, wa_id, name):
 
     chain = prompt_template | model | StrOutputParser()
 
-    result = chain.invoke({})
-    logging.info(f"Generated message: {result}")
+    result = chain.invoke({"stickers_description": stickers_description})
 
-    return result
+    matching = re.match(r"(?:\*(.*)\*\s*)?(.+)(?:\s*\*(.*)\*)?", result)
+    response = matching.group(2).strip()
+    sticker_name = matching.group(1) or matching.group(3)
+
+    logging.info(f"Generated message: [{response}] [{sticker_name}]")
+
+    return response, sticker_name
