@@ -40,12 +40,10 @@ def get_cantonese_audio(text):
         {
             "api_key": CANTONESE_AI_API_KEY,
             "text": text,
-            "tts_mode": "tts_with_voice_cloning",
-            "tts_model_version": "v2",
             "speed": 0.85,
             "pitch": 1,
             "output_extension": "mp3",
-            "voice_clone_voice_id": VOICE_ID,
+            "voice_id": VOICE_ID,
             "should_enhance": False,
         }
     )
