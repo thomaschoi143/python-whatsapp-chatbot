@@ -3,29 +3,6 @@ import json
 from dotenv import load_dotenv, find_dotenv
 import os
 import logging
-from pydub import AudioSegment
-import sys
-
-
-def trim_mp3(input_file, output_file, trim_ms=800):
-    """
-    Trims the first `trim_ms` milliseconds from an MP3 file.
-    :param input_file: Path to the input MP3 file.
-    :param output_file: Path to save the trimmed MP3 file.
-    :param trim_ms: Number of milliseconds to trim from the beginning (default: 1000ms = 1s).
-    """
-    try:
-        # Load the MP3 file
-        audio = AudioSegment.from_mp3(input_file)
-
-        # Trim the first `trim_ms` milliseconds
-        trimmed_audio = audio[trim_ms:]
-
-        # Export the trimmed audio to a new MP3 file
-        trimmed_audio.export(output_file, format="mp3")
-        logging.info(f"Trimmed audio saved")
-    except Exception as e:
-        logging.info(f"Error processing file: {e}")
 
 
 load_dotenv(find_dotenv())
