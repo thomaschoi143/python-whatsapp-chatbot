@@ -1,0 +1,73 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Resources:
+    SharedLayer:
+        Type: AWS::Serverless::LayerVersion
+        Properties:
+            LayerName: SharedUtilsLayer
+            Description: 'Shared utilities for retrieving secrets'
+            ContentUri: layers/shared_utils/
+            CompatibleRuntimes:
+                - python3.9
+    Verify:
+        Type: AWS::Serverless::Function
+        Properties:
+            FunctionName: Chatbot-Verify
+            Handler: app.lambda_handler
+            Runtime: python3.9
+            CodeUri: functions/verify/
+            MemorySize: 128
+            Timeout: 10
+            Layers:
+                - !Ref SharedLayer
+            Role: arn:aws:iam::851725468744:role/lambda-execution-with-secrets-access
+    OpenAI:
+        Type: AWS::Serverless::Function
+        Properties:
+            FunctionName: Chatbot-OpenAI
+            Handler: app.lambda_handler
+            Runtime: python3.9
+            CodeUri: functions/openAI/
+            MemorySize: 128
+            Timeout: 10
+            Layers:
+                - !Ref SharedLayer
+            Role: arn:aws:iam::851725468744:role/lambda-execution-with-secrets-access-dynamodb
+
+    CantoneseAI:
+        Type: AWS::Serverless::Function
+        Properties:
+            FunctionName: Chatbot-CantoneseAI
+            Handler: app.lambda_handler
+            Runtime: python3.9
+            CodeUri: functions/cantoneseAI/
+            MemorySize: 128
+            Timeout: 10
+            Layers:
+                - !Ref SharedLayer
+            Role: arn:aws:iam::851725468744:role/lambda-execution-with-secrets-access
+    GetStickerUrl:
+        Type: AWS::Serverless::Function
+        Properties:
+            FunctionName: Chatbot-GetStickerUrl
+            Handler: app.lambda_handler
+            Runtime: python3.9
+            CodeUri: functions/getStickerUrl/
+            MemorySize: 128
+            Timeout: 10
+            Layers:
+                - !Ref SharedLayer
+            Role: arn:aws:iam::851725468744:role/lambda-execution-with-secrets-access-dynamodb
+    SendMessage:
+        Type: AWS::Serverless::Function
+        Properties:
+            FunctionName: Chatbot-SendMessage
+            Handler: app.lambda_handler
+            Runtime: python3.9
+            CodeUri: functions/sendMessage/
+            MemorySize: 128
+            Timeout: 10
+            Layers:
+                - !Ref SharedLayer
+            Role: arn:aws:iam::851725468744:role/lambda-execution-with-secrets-access
