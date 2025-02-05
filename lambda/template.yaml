@@ -22,6 +22,30 @@ Resources:
             Layers:
                 - !Ref SharedLayer
             Role: arn:aws:iam::851725468744:role/lambda-execution-with-secrets-access
+    IdentifyUser:
+        Type: AWS::Serverless::Function
+        Properties:
+            FunctionName: Chatbot-IdentifyUser
+            Handler: app.lambda_handler
+            Runtime: python3.9
+            CodeUri: functions/identifyUser/
+            MemorySize: 128
+            Timeout: 10
+            Layers:
+                - !Ref SharedLayer
+            Role: arn:aws:iam::851725468744:role/lambda-execution-with-secrets-access-dynamodb
+    ToggleAudio:
+        Type: AWS::Serverless::Function
+        Properties:
+            FunctionName: Chatbot-ToggleAudio
+            Handler: app.lambda_handler
+            Runtime: python3.9
+            CodeUri: functions/toggleAudio/
+            MemorySize: 128
+            Timeout: 10
+            Layers:
+                - !Ref SharedLayer
+            Role: arn:aws:iam::851725468744:role/lambda-execution-with-secrets-access-dynamodb
     OpenAI:
         Type: AWS::Serverless::Function
         Properties:

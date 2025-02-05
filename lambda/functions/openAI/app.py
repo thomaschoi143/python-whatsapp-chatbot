@@ -10,28 +10,8 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 OPENAI_API_KEY = get_secret("prod/openAI")["API_KEY"]
-PHONE_KEYS = get_secret("prod/phone")
-GF_WA_ID = PHONE_KEYS["GF_WA_ID"]
-MY_WA_ID = PHONE_KEYS["MY_WA_ID"]
-FM_WA_IDS = PHONE_KEYS["FM_WA_IDS"].split(",")
 
-model = ChatOpenAI(model="gpt-4o", api_key=OPENAI_API_KEY)
-stickers_description = db_get_all_variables("chatbot-stickers", "description")
-
-
-def decide_system_msg(wa_id, name):
-    system_msg = f"You are a helpful WhatsApp assistant. You are serving {name}"
-    sticker_instruction = f"回覆中在這裏選擇合適的情緒：{stickers_description}。"
-    if wa_id == GF_WA_ID:
-        system_msg = """你係一個廣東話男朋友Thomas，今年22歲，你來自澳門，現在墨爾本大學讀電腦。你有一個女朋友叫Carrie，你掛住佢。
-                    。你嘅廣東話要自然啲，唔好太書面化，盡量唔好中英夾雜。句子一定要30個中文字內。說話要温柔，安慰到佢，陪人傾計。句子一定要30個中文字內。"""
-        system_msg += sticker_instruction
-    elif wa_id == MY_WA_ID:
-        system_msg = """你係一個繁體中文廣東話助手。廣東話要自然啲。廣東話要自然啲。句子一定要30個中文字內。句子一定要30個中文字內。你服務緊Thomas。"""
-        system_msg += sticker_instruction
-    elif wa_id in FM_WA_IDS:
-        system_msg = f"你係一個廣東話助手Thomas。你有屋企人叫{name}。熱心助人。幫助解決屋企大小事。"
-    return system_msg
+model = ChatOpenAI(model="gpt-4o-mini", api_key=OPENAI_API_KEY)
 
 
 def lambda_handler(event, context):
@@ -39,8 +19,7 @@ def lambda_handler(event, context):
         logging.info("Warmed up")
         return {"status": "warmed up"}
 
-    message_body, wa_id, name = event["text"], event["wa_id"], event["name"]
-    system_msg = decide_system_msg(wa_id, name)
+    message_body, wa_id, system_msg = event["text"], event["wa_id"], event["system_msg"]
 
     prompt = ChatPromptTemplate.from_messages(
         [
@@ -55,7 +34,7 @@ def lambda_handler(event, context):
     chain_with_history = RunnableWithMessageHistory(
         chain,
         lambda session_id: DynamoDBChatMessageHistory(
-            table_name=chat_history_table, session_id=session_id, primary_key_name="session_id"
+            table_name=chat_history_table, session_id=session_id, primary_key_name="session_id", history_size=20
         ),
         input_messages_key="human_input",
         history_messages_key="history",
@@ -63,12 +42,13 @@ def lambda_handler(event, context):
 
     config = {"configurable": {"session_id": wa_id}}
 
-    result = chain_with_history.invoke({"human_input": message_body}, config=config)
+    response = chain_with_history.invoke({"human_input": message_body}, config=config).content
+    sticker_name = None
 
-    matching = re.match(r"(.*)\*(.*)\*", result.content)
-
-    response = matching.group(1).strip()
-    sticker_name = matching.group(2)
+    matching = re.match(r"(.*)\*(.*)\*", response)
+    if matching:
+        response = matching.group(1).strip()
+        sticker_name = matching.group(2)
 
     logging.info(f"Generated message: [{response}] [{sticker_name}]")
 
