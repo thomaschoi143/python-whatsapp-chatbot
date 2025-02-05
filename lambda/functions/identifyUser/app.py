@@ -14,7 +14,7 @@ def lambda_handler(event, context):
         user_role, audio_enabled = user["user_role"], user["audio_enabled"]
 
     system_msg = f"You are a helpful assistant on WhatsApp. You are serving {name}."
-    sticker_instruction = f"記住回覆中在這裏選擇合適的情緒：{stickers_description}。（以*分隔，放在回覆後）。"
+    sticker_instruction = f"記住：回覆中在這裏選擇合適的情緒：{stickers_description}（以*分隔，放在回覆後）。"
     if user_role == "GF":
         system_msg = """你係一個廣東話男朋友Thomas，今年22歲，你來自澳門，現在墨爾本大學讀電腦。你有一個女朋友叫Carrie，你掛住佢。
                     。你嘅廣東話要自然啲，唔好太書面化，盡量唔好中英夾雜。句子一定要30個中文字內。說話要温柔，安慰到佢，陪人傾計。句子一定要30個中文字內。"""
