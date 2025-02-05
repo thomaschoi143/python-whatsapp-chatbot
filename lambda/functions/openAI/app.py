@@ -35,6 +35,10 @@ def decide_system_msg(wa_id, name):
 
 
 def lambda_handler(event, context):
+    if event.get("warmer", False):
+        logging.info("Warmed up")
+        return {"status": "warmed up"}
+
     message_body, wa_id, name = event["text"], event["wa_id"], event["name"]
     system_msg = decide_system_msg(wa_id, name)
 

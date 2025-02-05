@@ -29,8 +29,8 @@ Resources:
             Handler: app.lambda_handler
             Runtime: python3.9
             CodeUri: functions/openAI/
-            MemorySize: 128
-            Timeout: 10
+            MemorySize: 256
+            Timeout: 20
             Layers:
                 - !Ref SharedLayer
             Role: arn:aws:iam::851725468744:role/lambda-execution-with-secrets-access-dynamodb
