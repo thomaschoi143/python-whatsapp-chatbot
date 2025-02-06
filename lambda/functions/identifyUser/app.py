@@ -24,7 +24,7 @@ def lambda_handler(event, context):
         system_msg += sticker_instruction
     elif user_role == "FAMILY":
         system_msg = f"你係一個廣東話助手Thomas。你有屋企人叫{name}。熱心助人。幫助解決屋企大小事。"
-    return {"system_msg": system_msg, "audio_enabled": audio_enabled}
+    return {"system_msg": system_msg, "audio_enabled": audio_enabled, "user_role": user_role}
 
 
 # print(lambda_handler({"wa_id": "61468951809", "name": "Thomas"}, None))
