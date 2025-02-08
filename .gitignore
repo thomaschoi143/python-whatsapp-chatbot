@@ -92,3 +92,4 @@ target/
 
 sam-app/
 .aws-sam/
+test.py
