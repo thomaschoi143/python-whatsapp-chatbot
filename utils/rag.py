@@ -54,35 +54,44 @@ def chunk_text(text: str, chunk_size: int, overlap: int, metadata: dict) -> List
     return doc_items
 
 
-def extract_week_lecture(filename: str) -> str:
-    """Extracts [week]-[lecture] from filename."""
-    match = re.match(r"(\d+-\d+)-", filename)
-    return match.group(1) if match else "unknown"
+def extract_source(filename: str) -> str:
+    match = re.match(r"(\d+)-(\d+)-([a-zA-Z]+)", filename)
+    return f"W{match.group(1)}L{match.group(2)}-{match.group(3)}" if match else "unknown"
 
 
-def upload_documents(directory_path):
+def upload_documents(directory_path, chunk_size, overlap):
+    total_doc_items = 0
     for file in os.listdir(directory_path):
         if file.endswith(".pdf"):
             doc_items = []
             pdf_path = os.path.join(directory_path, file)
             text = extract_text_from_pdf(pdf_path)
-            source = extract_week_lecture(file)
+            source = extract_source(file)
             doc_items = chunk_text(text, chunk_size, overlap, {"source": source, "subject": directory_path.name})
             uuids = [str(uuid4()) for _ in range(len(doc_items))]
 
+            total_doc_items += len(doc_items)
             vector_store.add_documents(documents=doc_items, ids=uuids)
-            print(f"Uploaded {len(doc_items)} items from {file}.")
+            print(f"Uploaded {len(doc_items)} items from {file}")
+
+    print(f"Uploaded items in total: {total_doc_items}")
 
 
-chunk_size = 500  # Adjust as needed
-overlap = 100  # Adjust as needed
-folder = Path("../data/slides/comp30027")
-upload_documents(script_dir / folder)
+def clear_collection():
+    MONGODB_COLLECTION.delete_many({})
+    print("Vector store collection was cleared")
 
-# retriever = vector_store.as_retriever(
-#         search_type="similarity_score_threshold",
-#         search_kwargs={"k": 3, "score_threshold": 0.2},
-#     )
-# results = retriever.invoke("Stealing from the bank is a crime")
-# for res in results:
-#     print(f"* {res.page_content} [{res.metadata}]")
+
+# chunk_size = 2000  # Adjust as needed
+# overlap = 500  # Adjust as needed
+# folder = Path("../data/slides/comp30027")
+# clear_collection()
+# upload_documents(script_dir / folder, chunk_size, overlap)
+
+retriever = vector_store.as_retriever(
+    search_type="similarity_score_threshold",
+    search_kwargs={"k": 3, "score_threshold": 0.2},
+)
+results = retriever.invoke("Who is the lecturer of this lecture")
+for res in results:
+    print(f"* {res.page_content} [{res.metadata}]")
