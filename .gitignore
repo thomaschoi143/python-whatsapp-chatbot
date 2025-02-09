@@ -93,3 +93,4 @@ target/
 sam-app/
 .aws-sam/
 test.py
+langchain_test.py
